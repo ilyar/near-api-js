@@ -2,7 +2,7 @@
  * The classes in this module are used in conjunction with the {@link BrowserLocalStorageKeyStore}. This module exposes two classes:
  * * {@link WalletConnection} which redirects users to {@link https://docs.near.org/docs/tools/near-wallet | NEAR Wallet} for key management.
  * * {@link ConnectedWalletAccount} is an {@link Account} implementation that uses {@link WalletConnection} to get keys
- * 
+ *
  * @module walletAccount
  */
 import depd from 'depd';
@@ -16,6 +16,7 @@ import { KeyPair, PublicKey } from './utils';
 import { baseDecode } from 'borsh';
 import { Connection } from './connection';
 import { serialize } from 'borsh';
+import {AccessKeyInfoView} from './providers/provider';
 
 const LOGIN_WALLET_URL_SUFFIX = '/login/';
 const MULTISIG_HAS_METHOD = 'add_request_and_confirm';
@@ -45,13 +46,13 @@ interface RequestSignTransactionsOptions {
 /**
  * This class is used in conjunction with the {@link BrowserLocalStorageKeyStore}.
  * It redirects users to {@link https://docs.near.org/docs/tools/near-wallet | NEAR Wallet} for key management.
- * 
+ *
  * @example {@link https://docs.near.org/docs/develop/front-end/naj-quick-reference#wallet}
  * @example
  * ```js
  * // create new WalletConnection instance
  * const wallet = new WalletConnection(near, 'my-app');
- * 
+ *
  * // If not signed in redirect to the NEAR wallet to sign in
  * // keys will be stored in the BrowserLocalStorageKeyStore
  * if(!wallet.isSingnedIn()) return wallet.requestSignIn()
@@ -77,12 +78,12 @@ export class WalletConnection {
     _near: Near;
 
     /** @hidden */
-    _connectedAccount: ConnectedWalletAccount;
+    _connectedAccount?: ConnectedWalletAccount;
 
     constructor(near: Near, appKeyPrefix: string | null) {
         this._near = near;
         const authDataKey = appKeyPrefix + LOCAL_STORAGE_KEY_SUFFIX;
-        const authData = JSON.parse(window.localStorage.getItem(authDataKey));
+        const authData = JSON.parse(window.localStorage.getItem(authDataKey) || '{ "allKeys": [] }');
         this._networkId = near.config.networkId;
         this._walletBaseUrl = near.config.walletUrl;
         appKeyPrefix = appKeyPrefix || near.config.contractName || 'default';
@@ -151,7 +152,7 @@ export class WalletConnection {
         const newUrl = new URL(this._walletBaseUrl + LOGIN_WALLET_URL_SUFFIX);
         newUrl.searchParams.set('success_url', options.successUrl || currentUrl.href);
         newUrl.searchParams.set('failure_url', options.failureUrl || currentUrl.href);
-        if (options.contractId) {            
+        if (options.contractId) {
             /* Throws exception if contract account does not exist */
             const contractAccount = await this._near.account(options.contractId);
             await contractAccount.state();
@@ -344,7 +345,7 @@ export class ConnectedWalletAccount extends Account {
      * @param receiverId The NEAR account attempting to have access
      * @param actions The action(s) needed to be checked for access
      */
-    async accessKeyMatchesTransaction(accessKey, receiverId: string, actions: Action[]): Promise<boolean> {
+    async accessKeyMatchesTransaction(accessKey: AccessKeyInfoView, receiverId: string, actions: Action[]): Promise<boolean> {
         const { access_key: { permission } } = accessKey;
         if (permission === 'FullAccess') {
             return true;
